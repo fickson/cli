@@ -1,0 +1,42 @@
+# Dependencies (rebuilt in container)
+node_modules/
+target/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Development files
+.git/
+.gitignore
+.env
+.env.local
+*.log
+docker-compose.yml
+Dockerfile.dev
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Test files
+*.test.ts
+*.spec.ts
+__tests__/
+tests/
+coverage/
+
+# Secrets (NEVER include in image)
+.sekuire/secret.key
+
+# OS files
+.DS_Store
+Thumbs.db

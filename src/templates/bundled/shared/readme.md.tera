@@ -1,0 +1,72 @@
+# {{ name }}
+
+A compliant AI agent built with Sekuire.
+
+## Quick Start
+
+```bash
+# Install dependencies
+npm install
+
+# Configure environment
+cp .env.example .env
+# Edit .env and add your API keys
+
+# Run agent
+npm start
+```
+
+## Configuration
+
+Agent configuration is in `sekuire.yml`. Key settings:
+
+- **LLM**: Currently using gpt-4 (OpenAI)
+- **Compliance**: HIPAA framework enabled
+- **Tools**: calculator, web_search
+
+## Tools
+
+### calculator
+Perform mathematical calculations.
+
+### web_search
+Search the web using DuckDuckGo.
+
+## Development
+
+```bash
+# Test agent
+npm test
+
+# Validate configuration
+sekuire validate
+
+# Calculate agent ID
+sekuire hash
+```
+
+## Deployment
+
+```bash
+# Login to Sekuire
+sekuire login
+
+# Push agent (draft)
+sekuire push
+```
+
+## Compliance
+
+This agent is configured with:
+- HIPAA compliance framework
+- Audit logging enabled
+- Sensitive data detection
+- Tool whitelisting
+
+All actions are logged and can be audited.
+
+## Learn More
+
+- [Sekuire Documentation](https://docs.sekuire.ai)
+- [Trust Protocol](https://docs.sekuire.ai/trust-protocol)
+- [Compliance Guide](https://docs.sekuire.ai/compliance)

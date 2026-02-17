@@ -1,0 +1,9 @@
+sekuire-sdk>=0.1.0
+{% if framework == "fastapi" %}fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+{% elif framework == "django" %}django>=5.0
+djangorestframework>=3.14
+gunicorn>=21.2
+{% else %}fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+{% endif %}

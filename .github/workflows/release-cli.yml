@@ -1,0 +1,333 @@
+name: Release Sekuire CLI
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - beta
+        default: 'patch'
+      build_linux_amd64:
+        description: 'Build for Linux (x86_64)'
+        type: boolean
+        default: true
+      build_macos_intel:
+        description: 'Build for macOS (Intel)'
+        type: boolean
+        default: true
+      build_macos_arm:
+        description: 'Build for macOS (Apple Silicon)'
+        type: boolean
+        default: true
+      build_windows:
+        description: 'Build for Windows (x86_64)'
+        type: boolean
+        default: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RELEASE_REPO: sekuire/releases  # Public repository for releases
+
+permissions:
+  contents: write  # Allow pushing commits and tags
+  packages: write  # Allow package publishing
+
+jobs:
+  prepare-release:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.calculate_version.outputs.new_version }}
+      changelog: ${{ steps.generate_changelog.outputs.changelog }}
+      matrix: ${{ steps.compute_matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
+
+      - name: Setup Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Calculate New Version
+        id: calculate_version
+        run: |
+          # Get current version from CLI package
+          CURRENT=$(grep '^version = ' packages/cli/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "Current version: $CURRENT"
+
+          # Remove pre-release suffix if present to get base version
+          BASE_VERSION=$(echo "$CURRENT" | cut -d'-' -f1)
+
+          # Calculate new version based on bump type
+          case "${{ github.event.inputs.version_bump }}" in
+            patch)
+              # Split base version into parts (e.g., 0.1.1 -> 0, 1, 1)
+              IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
+              # If current is beta, use same base, otherwise increment patch
+              if [[ $CURRENT == *"-beta."* ]]; then
+                NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+              else
+                NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+              fi
+              ;;
+            minor)
+              IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
+              NEW_VERSION="$MAJOR.$((MINOR + 1)).0"
+              ;;
+            major)
+              IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
+              NEW_VERSION="$((MAJOR + 1)).0.0"
+              ;;
+            beta)
+              if [[ $CURRENT == *"-beta."* ]]; then
+                # Already a beta, increment beta number (0.1.1-beta.1 -> 0.1.1-beta.2)
+                BETA_NUM=$(echo $CURRENT | grep -oP 'beta\.\K\d+')
+                NEW_VERSION="$BASE_VERSION-beta.$((BETA_NUM + 1))"
+              else
+                # Not a beta, bump patch and add -beta.1 (0.1.0 -> 0.1.1-beta.1)
+                IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
+                NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))-beta.1"
+              fi
+              ;;
+          esac
+
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New version: $NEW_VERSION"
+
+      - name: Update CLI Version
+        run: |
+          NEW_VERSION="${{ steps.calculate_version.outputs.new_version }}"
+          # Update only the CLI Cargo.toml
+          sed -i.bak "s/^version = \".*\"/version = \"$NEW_VERSION\"/" packages/cli/Cargo.toml
+          rm packages/cli/Cargo.toml.bak
+          echo "Updated packages/cli/Cargo.toml to version $NEW_VERSION"
+
+      - name: Generate Changelog
+        id: generate_changelog
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$PREV_TAG" ]; then
+            PREV_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
+
+          # Generate changelog from commits
+          CHANGELOG=$(git log $PREV_TAG..HEAD --pretty=format:"- %s" --no-merges | grep -E "^- (feat|fix|chore|docs|refactor|perf|test):" || echo "- Initial release")
+
+          # Format changelog
+          echo "## What's Changed" > CHANGELOG_TEMP.md
+          echo "" >> CHANGELOG_TEMP.md
+          echo "$CHANGELOG" | sed 's/^- feat:/### ✨ New Features\n-/g; s/^- fix:/### 🐛 Bug Fixes\n-/g; s/^- chore:/### 🔧 Chores\n-/g' >> CHANGELOG_TEMP.md
+
+          CHANGELOG_CONTENT=$(cat CHANGELOG_TEMP.md)
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG_CONTENT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Update Cargo.lock
+        run: |
+          # Update Cargo.lock without full dependency download
+          cargo generate-lockfile
+          git add Cargo.lock
+
+      - name: Compute Build Matrix
+        id: compute_matrix
+        run: |
+          MATRIX='{"include":['
+          FIRST=true
+
+          if [ "${{ inputs.build_linux_amd64 }}" = "true" ]; then
+            [ "$FIRST" = "false" ] && MATRIX+=','
+            MATRIX+='{"target":"x86_64-unknown-linux-gnu","os":"ubuntu-latest","name":"sekuire-linux-amd64","archive":"tar.gz"}'
+            FIRST=false
+          fi
+
+          if [ "${{ inputs.build_macos_intel }}" = "true" ]; then
+            [ "$FIRST" = "false" ] && MATRIX+=','
+            MATRIX+='{"target":"x86_64-apple-darwin","os":"macos-15","name":"sekuire-darwin-amd64","archive":"tar.gz"}'
+            FIRST=false
+          fi
+
+          if [ "${{ inputs.build_macos_arm }}" = "true" ]; then
+            [ "$FIRST" = "false" ] && MATRIX+=','
+            MATRIX+='{"target":"aarch64-apple-darwin","os":"macos-15","name":"sekuire-darwin-arm64","archive":"tar.gz"}'
+            FIRST=false
+          fi
+
+          if [ "${{ inputs.build_windows }}" = "true" ]; then
+            [ "$FIRST" = "false" ] && MATRIX+=','
+            MATRIX+='{"target":"x86_64-pc-windows-msvc","os":"windows-latest","name":"sekuire-windows-x86_64","archive":"zip"}'
+            FIRST=false
+          fi
+
+          MATRIX+=']}'
+
+          if [ "$FIRST" = "true" ]; then
+            echo "::error::At least one platform must be selected"
+            exit 1
+          fi
+
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          echo "Build matrix: $MATRIX"
+
+      - name: Commit Version Bump
+        run: |
+          git add packages/cli/Cargo.toml Cargo.lock
+          git commit -m "chore: bump CLI version to ${{ steps.calculate_version.outputs.new_version }}"
+          git pull --rebase origin master
+          git push origin HEAD
+
+      - name: Create and Push Tag
+        run: |
+          git tag -a "v${{ steps.calculate_version.outputs.new_version }}" -m "Release v${{ steps.calculate_version.outputs.new_version }}"
+          git push origin "v${{ steps.calculate_version.outputs.new_version }}"
+
+  build-and-upload:
+    name: Build ${{ matrix.target }}
+    needs: prepare-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix: ${{ fromJSON(needs.prepare-release.outputs.matrix) }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: "v${{ needs.prepare-release.outputs.new_version }}"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-${{ matrix.target }}-${{ hashFiles('packages/cli/Cargo.toml', 'packages/protocol/Cargo.toml', 'Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ matrix.target }}-
+
+      - name: Build Binary
+        working-directory: packages/cli
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package Binary (Unix)
+        if: matrix.archive == 'tar.gz'
+        run: |
+          cd target/${{ matrix.target }}/release
+          mv sekuire ${{ matrix.name }}
+          tar -czf ../../../${{ matrix.name }}.tar.gz ${{ matrix.name }}
+          cd ../../..
+          shasum -a 256 ${{ matrix.name }}.tar.gz > ${{ matrix.name }}.tar.gz.sha256
+
+      - name: Package Binary (Windows)
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          cd target/${{ matrix.target }}/release
+          Rename-Item sekuire.exe ${{ matrix.name }}.exe
+          Compress-Archive -Path ${{ matrix.name }}.exe -DestinationPath ../../../${{ matrix.name }}.zip
+          cd ../../..
+          $hash = (Get-FileHash -Algorithm SHA256 ${{ matrix.name }}.zip).Hash.ToLower()
+          "$hash  ${{ matrix.name }}.zip" | Out-File -Encoding ASCII ${{ matrix.name }}.zip.sha256
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: |
+            ${{ matrix.name }}.${{ matrix.archive }}
+            ${{ matrix.name }}.${{ matrix.archive }}.sha256
+
+  create-release:
+    name: Create GitHub Release
+    needs: [prepare-release, build-and-upload]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release in Public Repo
+        uses: softprops/action-gh-release@v1
+        with:
+          repository: ${{ env.RELEASE_REPO }}
+          tag_name: "v${{ needs.prepare-release.outputs.new_version }}"
+          name: "Sekuire CLI v${{ needs.prepare-release.outputs.new_version }}"
+          body: |
+            ${{ needs.prepare-release.outputs.changelog }}
+
+            ## Quick Install
+
+            ### macOS / Linux
+            ```bash
+            curl -fsSL https://install.sekuire.ai | sh
+            ```
+
+            ### Windows (PowerShell)
+            ```powershell
+            irm https://install.sekuire.ai/windows | iex
+            ```
+
+            ## Manual Installation
+
+            ### macOS (Apple Silicon)
+            ```bash
+            curl -LO https://github.com/${{ env.RELEASE_REPO }}/releases/download/v${{ needs.prepare-release.outputs.new_version }}/sekuire-darwin-arm64.tar.gz
+            tar -xzf sekuire-darwin-arm64.tar.gz
+            sudo mv sekuire-darwin-arm64 /usr/local/bin/sekuire
+            ```
+
+            ### macOS (Intel)
+            ```bash
+            curl -LO https://github.com/${{ env.RELEASE_REPO }}/releases/download/v${{ needs.prepare-release.outputs.new_version }}/sekuire-darwin-amd64.tar.gz
+            tar -xzf sekuire-darwin-amd64.tar.gz
+            sudo mv sekuire-darwin-amd64 /usr/local/bin/sekuire
+            ```
+
+            ### Linux (x86_64)
+            ```bash
+            curl -LO https://github.com/${{ env.RELEASE_REPO }}/releases/download/v${{ needs.prepare-release.outputs.new_version }}/sekuire-linux-amd64.tar.gz
+            tar -xzf sekuire-linux-amd64.tar.gz
+            sudo mv sekuire-linux-amd64 /usr/local/bin/sekuire
+            ```
+
+            ### Windows (x86_64)
+            ```powershell
+            curl -LO https://github.com/${{ env.RELEASE_REPO }}/releases/download/v${{ needs.prepare-release.outputs.new_version }}/sekuire-windows-x86_64.zip
+            Expand-Archive sekuire-windows-x86_64.zip
+            Move-Item sekuire-windows-x86_64\sekuire-windows-x86_64.exe sekuire.exe
+            # Add to PATH manually or use the installer above
+            ```
+
+            ---
+
+            Full installation guide: https://github.com/sekuire/agent/blob/master/docs/getting-started/installation.md
+          files: artifacts/**/*
+          draft: false
+          prerelease: ${{ contains(needs.prepare-release.outputs.new_version, 'beta') }}
+          token: ${{ secrets.RELEASE_REPO_TOKEN }}
+
+      - name: Trigger Install Page Deployment
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_REPO_TOKEN }}
+        run: |
+          gh api repos/sekuire/install/dispatches \
+            --method POST \
+            -f event_type=cli-release \
+            -f "client_payload[version]=${{ needs.prepare-release.outputs.new_version }}"

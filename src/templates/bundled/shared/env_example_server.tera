@@ -1,0 +1,16 @@
+# LLM API Keys
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_API_KEY=...
+
+# Server Configuration
+MODE=http
+PORT=8000
+HOST=0.0.0.0
+
+# Sekuire Registry
+SEKUIRE_REGISTRY_URL=https://api.sekuire.ai
+
+# Optional: Agent Keys (generated in .sekuire/ directory)
+# SEKUIRE_PRIVATE_KEY=...
+# SEKUIRE_PUBLIC_KEY=...

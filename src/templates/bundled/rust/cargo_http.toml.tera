@@ -1,0 +1,20 @@
+[workspace]
+
+[package]
+name = "{{ package_name }}"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sekuire-sdk = { path = "../../packages/sdk" }
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+{% if framework == "axum" %}axum = "0.7"
+tower-http = { version = "0.5", features = ["cors"] }
+{% elif framework == "actix" %}actix-web = "4"
+actix-cors = "0.7"
+{% else %}tokio = { version = "1.0", features = ["full", "net"] }
+hyper = { version = "1.0", features = ["server", "http1"] }
+{% endif %}

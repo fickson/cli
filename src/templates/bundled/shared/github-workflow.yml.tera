@@ -1,0 +1,62 @@
+{% raw %}name: Sekuire Build & Push
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+env:
+  REGISTRY: registry.sekuire.ai{% endraw %}
+  IMAGE_NAME: {{ agent_name }}
+{% raw %}
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+{% endraw -%}
+
+{% if language == "rust" %}
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release
+      - name: Build Docker image
+{% raw %}        run: docker build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} .{% endraw %}
+{% elif language == "python" %}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Build Docker image
+{% raw %}        run: docker build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} .{% endraw %}
+{% else %}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: npm run build
+      - name: Build Docker image
+{% raw %}        run: docker build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} .{% endraw %}
+{% endif %}
+
+{% raw %}      - name: Login to Sekuire Registry
+        run: |
+          echo "${{ secrets.SEKUIRE_PUSH_TOKEN }}" | \
+            docker login ${{ env.REGISTRY }} -u token --password-stdin
+
+      - name: Tag and push
+        run: |
+          docker tag ${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker tag ${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Trigger vulnerability scan
+        if: success()
+        run: |
+          curl -s -X POST \
+            -H "X-API-Key: ${{ secrets.SEKUIRE_API_KEY }}" \
+            "${{ secrets.SEKUIRE_BACKEND_URL }}/api/v1/images/${{ env.IMAGE_NAME }}:${{ github.sha }}/scan" \
+            || true
+{% endraw %}

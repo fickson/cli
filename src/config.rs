@@ -1,0 +1,13 @@
+pub const DEFAULT_REGISTRY_URL: &str = "https://api.sekuire.ai";
+pub const DEFAULT_WEB_URL: &str = "https://sekuire.ai";
+pub const DEFAULT_DOCKER_REGISTRY_URL: &str = "https://registry.sekuire.ai";
+pub const DEFAULT_AGENT_URL: &str = "http://localhost:8000";
+pub const DEFAULT_PORT: u16 = 8000;
+pub const SEKUIRE_DIR: &str = ".sekuire";
+pub const SECRET_KEY_FILE: &str = "secret.key";
+pub const PUBLIC_KEY_FILE: &str = "public.key";
+pub const AUTH_CONFIG_FILE: &str = "auth.json";
+pub const MANIFEST_YAML: &str = "sekuire.yml";
+pub const MANIFEST_JSON: &str = "sekuire.json";
+pub const DEFAULT_HEARTBEAT_INTERVAL: i64 = 60;
+pub const DEFAULT_UPSTREAM_URL: &str = "http://localhost:8000/a2a/tasks";

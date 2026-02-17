@@ -1,0 +1,25 @@
+# Sekuire Agent Configuration
+# Copy this file to .env and fill in your API keys
+
+# LLM Provider Selection (Optional - overrides sekuire.yml)
+# LLM_PROVIDER=openai
+# LLM_MODEL=gpt-4
+
+# LLM Provider API Keys
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_API_KEY=...
+
+# For Ollama (local models)
+# OLLAMA_BASE_URL=http://localhost:11434
+
+# Sekuire Registry
+SEKUIRE_REGISTRY_URL=https://api.sekuire.ai
+SEKUIRE_WEB_URL=https://sekuire.ai
+
+# Environment
+NODE_ENV=development
+PORT=8000
+
+# Logging
+LOG_LEVEL=info

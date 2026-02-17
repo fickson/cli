@@ -1,0 +1,66 @@
+Integration guide:
+---
+{% if language == "python" and ai_framework == "langchain" -%}
+Add to your agent startup:
+  from sekuire_sdk import SekuireSDK, beacon
+  from sekuire_sdk.integrations.langchain import SekuireCallbackHandler
+
+  sdk = SekuireSDK.from_env()
+  handler = SekuireCallbackHandler(sdk)
+  chain = your_chain.with_config(callbacks=[handler])
+  beacon.start(agent_id=sdk.agent_id)
+{% elif language == "python" and ai_framework == "crewai" -%}
+Add to your crew setup:
+  from sekuire_sdk import SekuireSDK, beacon
+  from sekuire_sdk.integrations.crewai import SekuireAgentMonitor
+
+  sdk = SekuireSDK.from_env()
+  monitor = SekuireAgentMonitor(sdk)
+  crew = Crew(agents=[...], callbacks=[monitor])
+  beacon.start(agent_id=sdk.agent_id)
+{% elif language == "python" and ai_framework == "autogen" -%}
+Add to your autogen config:
+  from sekuire_sdk import SekuireSDK, beacon
+  from sekuire_sdk.integrations.autogen import SekuireMiddleware
+
+  sdk = SekuireSDK.from_env()
+  middleware = SekuireMiddleware(sdk)
+  # Add middleware to your assistant agent config
+  beacon.start(agent_id=sdk.agent_id)
+{% elif language == "python" -%}
+Add to your agent startup:
+  from sekuire_sdk import SekuireSDK, beacon
+
+  sdk = SekuireSDK.from_env()
+  beacon.start(agent_id=sdk.agent_id)
+  # Add Sekuire headers to outbound requests:
+  headers = sdk.get_trust_headers()
+{% elif language == "typescript" and ai_framework == "langchain" -%}
+Add to your agent startup:
+  import { SekuireSDK, beacon } from '@sekuire/sdk';
+  import { SekuireCallbackHandler } from '@sekuire/sdk/langchain';
+
+  const sdk = SekuireSDK.fromEnv();
+  const handler = new SekuireCallbackHandler(sdk);
+  const chain = yourChain.withConfig({ callbacks: [handler] });
+  beacon.start({ agentId: sdk.agentId });
+{% elif language == "typescript" -%}
+Add to your agent startup:
+  import { SekuireSDK, beacon } from '@sekuire/sdk';
+
+  const sdk = SekuireSDK.fromEnv();
+  beacon.start({ agentId: sdk.agentId });
+  // Add Sekuire headers to outbound requests:
+  const headers = sdk.getTrustHeaders();
+{% elif language == "rust" -%}
+Add to your agent startup:
+  use sekuire_sdk::{SekuireSDK, beacon};
+
+  let sdk = SekuireSDK::from_env()?;
+  beacon::start(&sdk).await?;
+  // Add trust headers to outbound requests:
+  let headers = sdk.get_trust_headers();
+{% else -%}
+Install the Sekuire SDK for your language and call beacon.start()
+See: https://docs.sekuire.ai/sdks
+{% endif -%}
