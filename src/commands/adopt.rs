@@ -78,7 +78,7 @@ pub async fn execute(name: Option<String>, model: Option<String>) -> Result<(), 
             .to_string()
     });
 
-    let model_name = model.unwrap_or_else(|| "gpt-4o".to_string());
+    let model_name = model.unwrap_or_else(|| "gemini-3.1-pro-preview".to_string());
 
     // Generate sekuire.yml
     let manifest_content = generate_manifest(&agent_name, &model_name, &detection);

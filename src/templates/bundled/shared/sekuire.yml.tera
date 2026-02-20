@@ -11,25 +11,34 @@ project:
 
 # Identity Configuration (Required for Verification)
 identity:
-  model: "gpt-4"
-  system_prompt_path: "./system_prompt.md"
-  tools_path: "./tools.json"
+  model: "{{ llm_model }}"
+  system_prompt_path: "{{ llm_primary_prompt_path }}"
+  tools_path: "{{ llm_primary_tools_path }}"
 
 # Installation / deployment metadata (displayed in the dashboard)
 deployment:
   docker_image: "sekuire/agent:{{ name }}"
   notes: "List the environment variables this agent needs so enterprises can review and install safely."
   env:
-    - name: "OPENAI_API_KEY"
+{% if llm_requires_api_key %}
+    - name: "{{ llm_api_key_env }}"
       required: true
       secret: true
-      description: "OpenAI API key for the agent LLM."
-      example: "sk-..."
-    - name: "OPENAI_MODEL"
+      description: "{{ llm_provider_display }} API key for the agent LLM."
+      example: "{{ llm_api_key_example }}"
+{% endif %}
+    - name: "LLM_MODEL"
       required: false
       secret: false
       description: "LLM model name."
-      default_value: "gpt-4o-mini"
+      default_value: "{{ llm_model }}"
+{% if llm_provider == "ollama" %}
+    - name: "OLLAMA_BASE_URL"
+      required: false
+      secret: false
+      description: "Ollama endpoint for local models."
+      default_value: "${OLLAMA_BASE_URL:-http://localhost:11434}"
+{% endif %}
     - name: "SEKUIRE_AGENT_ID"
       required: false
       secret: false
@@ -50,9 +59,12 @@ deployment:
 # You can use environment variables for dynamic configuration
 # Example: provider: "${LLM_PROVIDER:-openai}" uses env var with fallback
 llm:
-  provider: "openai"           # openai, anthropic, ollama, google
-  model: "gpt-4"               # Model name
-  api_key_env: "OPENAI_API_KEY" # Environment variable for API key
+  provider: "{{ llm_provider }}"           # openai, anthropic, ollama, google
+  model: "{{ llm_model }}"               # Model name
+  api_key_env: "{{ llm_api_key_env }}" # Environment variable for API key
+{% if llm_provider == "ollama" %}
+  base_url: "${OLLAMA_BASE_URL:-http://localhost:11434}"
+{% endif %}
   temperature: 0.7             # Creativity (0.0 - 1.0)
   max_tokens: 2000             # Max response length
   streaming: false             # Enable streaming responses
@@ -60,10 +72,10 @@ llm:
 # Agent Configuration
 agent:
   # System prompt file
-  system_prompt: "./system_prompt.md"
+  system_prompt: "{{ llm_primary_prompt_path }}"
 
   # Tools configuration
-  tools: "./tools.json"
+  tools: "{{ llm_primary_tools_path }}"
 
 {% if tools | length > 0 %}  # Built-in tools
   allowed_tools:
@@ -150,7 +162,9 @@ agent:
     allow:
       - "https://api.openai.com"
       - "https://api.anthropic.com"
+      - "https://generativelanguage.googleapis.com"
       - "https://api.duckduckgo.com"
+      - "http://localhost:11434"
     block: []
 
   # Filesystem permissions
@@ -187,5 +201,5 @@ server:
     origins: ["*"]
 
   auth:
-    type: "none"
+    type: "signed"
 {% endif %}

@@ -21,6 +21,16 @@ pub struct InitContext {
     pub memory_url: String,
     pub server_mode: bool,
     pub framework: String,
+    pub llm_provider: String,
+    pub llm_provider_display: String,
+    pub llm_model: String,
+    pub llm_api_key_env: String,
+    pub llm_api_key_example: String,
+    pub llm_requires_api_key: bool,
+    pub llm_base_url: String,
+    pub llm_variants: Vec<LlmVariantContext>,
+    pub llm_primary_prompt_path: String,
+    pub llm_primary_tools_path: String,
 }
 
 #[derive(Serialize)]
@@ -36,6 +46,22 @@ pub struct PackageContext {
     pub name: String,
     pub package_name: String,
     pub framework: String,
+    pub include_sqlite: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct LlmVariantContext {
+    pub key: String,
+    pub agent_suffix: String,
+    pub display_name: String,
+    pub provider: String,
+    pub model: String,
+    pub api_key_env: String,
+    pub api_key_example: String,
+    pub requires_api_key: bool,
+    pub base_url: String,
+    pub temperature: f32,
+    pub max_tokens: u32,
 }
 
 impl TemplateEngine {
@@ -97,6 +123,16 @@ impl InitContext {
             memory_url,
             server_mode: false,
             framework: String::new(),
+            llm_provider: "google".to_string(),
+            llm_provider_display: "Google Gemini".to_string(),
+            llm_model: "gemini-3.1-pro-preview".to_string(),
+            llm_api_key_env: "GOOGLE_API_KEY".to_string(),
+            llm_api_key_example: "...".to_string(),
+            llm_requires_api_key: true,
+            llm_base_url: String::new(),
+            llm_variants: Vec::new(),
+            llm_primary_prompt_path: "./system_prompt.md".to_string(),
+            llm_primary_tools_path: "./tools.json".to_string(),
         }
     }
 
@@ -131,10 +167,15 @@ impl DockerContext {
 
 impl PackageContext {
     pub fn new(name: &str, framework: &str) -> Self {
+        Self::with_sqlite(name, framework, false)
+    }
+
+    pub fn with_sqlite(name: &str, framework: &str, include_sqlite: bool) -> Self {
         Self {
             name: name.to_string(),
             package_name: name.to_lowercase().replace(' ', "-"),
             framework: framework.to_string(),
+            include_sqlite,
         }
     }
 }
@@ -240,5 +281,12 @@ mod tests {
         let ctx = PackageContext::new("My Cool Agent", "express");
         assert_eq!(ctx.package_name, "my-cool-agent");
         assert_eq!(ctx.framework, "express");
+        assert!(!ctx.include_sqlite);
+    }
+
+    #[test]
+    fn package_context_with_sqlite() {
+        let ctx = PackageContext::with_sqlite("My Cool Agent", "express", true);
+        assert!(ctx.include_sqlite);
     }
 }

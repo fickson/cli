@@ -1,5 +1,6 @@
 use crate::error::CliError;
 use crate::services::http_client::SekuireClient;
+use crate::ui;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -36,7 +37,12 @@ struct AccountFeatures {
 
 pub async fn execute_limits(registry: String) -> Result<(), CliError> {
     let client = SekuireClient::from_registry(&registry).await?;
-    let resp = client.get_checked("/api/v1/account/limits").await?;
+    let resp = ui::with_spinner_if(
+        ui::spinner_enabled(None),
+        "Fetching account limits...",
+        async { client.get_checked("/api/v1/account/limits").await },
+    )
+    .await?;
 
     let status = resp.status();
     if !status.is_success() {

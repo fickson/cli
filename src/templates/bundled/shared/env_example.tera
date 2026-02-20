@@ -2,8 +2,8 @@
 # Copy this file to .env and fill in your API keys
 
 # LLM Provider Selection (Optional - overrides sekuire.yml)
-# LLM_PROVIDER=openai
-# LLM_MODEL=gpt-4
+# LLM_PROVIDER=google
+# LLM_MODEL=gemini-3.1-pro-preview
 
 # LLM Provider API Keys
 OPENAI_API_KEY=sk-...

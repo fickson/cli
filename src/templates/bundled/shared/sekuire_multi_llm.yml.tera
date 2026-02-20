@@ -11,30 +11,31 @@ project:
 
 # Identity Configuration (Required for Verification)
 identity:
-  model: "gpt-4"
-  system_prompt_path: "./prompts/openai.md"
-  tools_path: "./tools/openai.json"
+  model: "{{ llm_model }}"
+  system_prompt_path: "{{ llm_primary_prompt_path }}"
+  tools_path: "{{ llm_primary_tools_path }}"
 
 # Installation / deployment metadata (displayed in the dashboard)
 deployment:
   docker_image: "sekuire/agent:{{ name }}"
   notes: "Populate required provider keys below; include tool-specific vars when you add external integrations."
   env:
-    - name: "OPENAI_API_KEY"
+{% for llm in llm_variants %}
+{% if llm.requires_api_key %}
+    - name: "{{ llm.api_key_env }}"
       required: true
       secret: true
-      description: "OpenAI API key."
-      example: "sk-..."
-    - name: "ANTHROPIC_API_KEY"
+      description: "{{ llm.display_name }} API key."
+      example: "{{ llm.api_key_example }}"
+{% endif %}
+{% if llm.provider == "ollama" %}
+    - name: "OLLAMA_BASE_URL"
       required: false
-      secret: true
-      description: "Anthropic API key."
-      example: "sk-ant-..."
-    - name: "GOOGLE_API_KEY"
-      required: false
-      secret: true
-      description: "Google API key (Gemini)."
-      example: "..."
+      secret: false
+      description: "Ollama endpoint for local models."
+      default_value: "${OLLAMA_BASE_URL:-{{ llm.base_url }}}"
+{% endif %}
+{% endfor %}
     - name: "SEKUIRE_AGENT_ID"
       required: false
       secret: false
@@ -53,76 +54,88 @@ deployment:
 
 # Multiple agent definitions, each optimized for specific LLM
 agents:
-  # OpenAI variant - Optimized for reasoning
-  {{ name }}-openai:
-    name: "{{ name }} (OpenAI)"
-    system_prompt: "./prompts/openai.md"
-    tools: "./tools/openai.json"
+{% for llm in llm_variants %}
+  {{ name }}-{{ llm.agent_suffix }}:
+    name: "{{ name }} ({{ llm.display_name }})"
+    system_prompt: "./prompts/{{ llm.key }}.md"
+    tools: "./tools/{{ llm.key }}.json"
     llm:
-      provider: "openai"
-      model: "gpt-4"
-      api_key_env: "OPENAI_API_KEY"
-      temperature: 0.7
-      max_tokens: 2000
+      provider: "{{ llm.provider }}"
+      model: "{{ llm.model }}"
+{% if llm.requires_api_key %}
+      api_key_env: "{{ llm.api_key_env }}"
+{% endif %}
+{% if llm.provider == "ollama" %}
+      base_url: "${OLLAMA_BASE_URL:-{{ llm.base_url }}}"
+{% endif %}
+      temperature: {{ llm.temperature }}
+      max_tokens: {{ llm.max_tokens }}
+{% if memory_type == "sqlite" %}
+    memory:
+      type: "sqlite"
+      config:
+        filename: "{{ memory_url }}"
+{% elif memory_type == "redis" %}
+    memory:
+      type: "redis"
+      config:
+        url: "{{ memory_url }}"
+{% elif memory_type == "postgres" %}
+    memory:
+      type: "postgres"
+      config:
+        url: "{{ memory_url }}"
+{% elif memory_type == "upstash" %}
+    memory:
+      type: "upstash"
+      config:
+        url: "{{ memory_url }}"
+        token: "${UPSTASH_REDIS_REST_TOKEN}"
+{% elif memory_type == "cloudflare-kv" %}
+    memory:
+      type: "cloudflare-kv"
+      config:
+        namespace_id: "{{ memory_url }}"
+        account_id: "${CF_ACCOUNT_ID}"
+        api_token: "${CF_API_TOKEN}"
+{% elif memory_type == "cloudflare-d1" %}
+    memory:
+      type: "cloudflare-d1"
+      config:
+        database_id: "{{ memory_url }}"
+        account_id: "${CF_ACCOUNT_ID}"
+        api_token: "${CF_API_TOKEN}"
+{% elif memory_type == "dynamodb" %}
+    memory:
+      type: "dynamodb"
+      config:
+        table_name: "{{ memory_url }}"
+        region: "${AWS_REGION:-us-east-1}"
+{% elif memory_type == "turso" %}
+    memory:
+      type: "turso"
+      config:
+        url: "{{ memory_url }}"
+        auth_token: "${TURSO_AUTH_TOKEN}"
+{% elif memory_type == "convex" %}
+    memory:
+      type: "convex"
+      config:
+        url: "{{ memory_url }}"
+{% elif memory_type == "file" %}
+    memory:
+      type: "file"
+      config:
+        path: "{{ memory_url }}"
+{% else %}
     memory:
       type: "buffer"
       max_messages: 10
+{% endif %}
     compliance:
       framework: "hipaa"
       audit_logging: true
-
-  # Claude variant - Optimized for document analysis
-  {{ name }}-claude:
-    name: "{{ name }} (Claude)"
-    system_prompt: "./prompts/claude.md"
-    tools: "./tools/claude.json"
-    llm:
-      provider: "anthropic"
-      model: "claude-3-opus-20240229"
-      api_key_env: "ANTHROPIC_API_KEY"
-      temperature: 0.9
-      max_tokens: 2000
-    memory:
-      type: "summary"
-      max_messages: 20
-    compliance:
-      framework: "hipaa"
-      audit_logging: true
-
-  # Gemini variant - Optimized for multimodal
-  {{ name }}-gemini:
-    name: "{{ name }} (Gemini)"
-    system_prompt: "./prompts/gemini.md"
-    tools: "./tools/gemini.json"
-    llm:
-      provider: "google"
-      model: "gemini-pro"
-      api_key_env: "GOOGLE_API_KEY"
-      temperature: 0.5
-      max_tokens: 2000
-    memory:
-      type: "buffer"
-      max_messages: 5
-    compliance:
-      framework: "hipaa"
-      audit_logging: true
-
-  # Ollama variant - Optimized for local/privacy
-  {{ name }}-local:
-    name: "{{ name }} (Local)"
-    system_prompt: "./prompts/ollama.md"
-    tools: "./tools/ollama.json"
-    llm:
-      provider: "ollama"
-      model: "llama2"
-      base_url: "http://localhost:11434"
-      temperature: 0.6
-    memory:
-      type: "buffer"
-      max_messages: 5
-    compliance:
-      framework: "hipaa"
-      audit_logging: true
+{% endfor %}
 
 # Shared logger configuration
 logger:

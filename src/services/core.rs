@@ -26,7 +26,7 @@ pub enum SekuireCommands {
         #[arg(short, long)]
         name: Option<String>,
 
-        /// The language template to use (python, rust, typescript)
+        /// The language template to use (currently typescript; rust/python coming soon)
         #[arg(short, long)]
         language: Option<String>,
 

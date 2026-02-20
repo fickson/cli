@@ -281,7 +281,7 @@ pub fn get_sekuire_json(name: &str) -> String {
     "authors": []
   }},
   "identity": {{
-    "model": "gpt-4-turbo",
+    "model": "gpt-5.2",
     "system_prompt_path": "./system_prompt.md",
     "tools_path": "./tools.json"
   }}
@@ -308,7 +308,7 @@ project:
 # Identity Configuration (Required for Verification)
 # Default identity for this project (maps to the OpenAI variant)
 identity:
-  model: "gpt-4"
+  model: "gpt-5.2"
   system_prompt_path: "./prompts/openai.md"
   tools_path: "./tools/openai.json"
 
@@ -357,7 +357,7 @@ agents:
     tools: "./tools/openai.json"
     llm:
       provider: "openai"
-      model: "gpt-4"
+      model: "gpt-5.2"
       api_key_env: "OPENAI_API_KEY"
       temperature: 0.7
       max_tokens: 2000
@@ -375,7 +375,7 @@ agents:
     tools: "./tools/claude.json"
     llm:
       provider: "anthropic"
-      model: "claude-3-opus-20240229"
+      model: "claude-sonnet-4-6"
       api_key_env: "ANTHROPIC_API_KEY"
       temperature: 0.9
       max_tokens: 2000
@@ -393,7 +393,7 @@ agents:
     tools: "./tools/gemini.json"
     llm:
       provider: "google"
-      model: "gemini-pro"
+      model: "gemini-3.1-pro-preview"
       api_key_env: "GOOGLE_API_KEY"
       temperature: 0.5
       max_tokens: 2000
@@ -411,7 +411,7 @@ agents:
     tools: "./tools/ollama.json"
     llm:
       provider: "ollama"
-      model: "llama2"
+      model: "llama3.1"
       base_url: "http://localhost:11434"
       temperature: 0.6
     memory:
@@ -491,7 +491,7 @@ project:
 
 # Identity Configuration (Required for Verification)
 identity:
-  model: "gpt-4"
+  model: "gpt-5.2"
   system_prompt_path: "./system_prompt.md"
   tools_path: "./tools.json"
 
@@ -509,7 +509,7 @@ deployment:
       required: false
       secret: false
       description: "LLM model name."
-      default_value: "gpt-4o-mini"
+      default_value: "gpt-5-mini"
     - name: "SEKUIRE_AGENT_ID"
       required: false
       secret: false
@@ -531,7 +531,7 @@ deployment:
 # Example: provider: "${{LLM_PROVIDER:-openai}}" uses env var with fallback
 llm:
   provider: "openai"           # openai, anthropic, ollama, google
-  model: "gpt-4"               # Model name
+  model: "gpt-5.2"               # Model name
   api_key_env: "OPENAI_API_KEY" # Environment variable for API key
   temperature: 0.7             # Creativity (0.0 - 1.0)
   max_tokens: 2000             # Max response length
@@ -591,7 +591,7 @@ logger:
 #     tools: "./tools.json"
 #     llm:
 #       provider: "openai"
-#       model: "gpt-4"
+#       model: "gpt-5.2"
 #       api_key_env: "OPENAI_API_KEY"
 #
 #   my-agent-claude:
@@ -600,7 +600,7 @@ logger:
 #     tools: "./tools.json"
 #     llm:
 #       provider: "anthropic"
-#       model: "claude-3-opus-20240229"
+#       model: "claude-sonnet-4-6"
 #       api_key_env: "ANTHROPIC_API_KEY"
 #
 #   my-agent-gemini:
@@ -609,7 +609,7 @@ logger:
 #     tools: "./tools.json"
 #     llm:
 #       provider: "google"
-#       model: "gemini-pro"
+#       model: "gemini-3.1-pro-preview"
 #       api_key_env: "GOOGLE_API_KEY"
 #
 #   my-agent-local:
@@ -618,7 +618,7 @@ logger:
 #     tools: "./tools.json"
 #     llm:
 #       provider: "ollama"
-#       model: "llama2"
+#       model: "llama3.1"
 #       base_url: "http://localhost:11434"
 "#,
         name = name,
@@ -793,7 +793,7 @@ pub fn get_env_example() -> &'static str {
 
 # LLM Provider Selection (Optional - overrides sekuire.yml)
 # LLM_PROVIDER=openai
-# LLM_MODEL=gpt-4
+# LLM_MODEL=gpt-5.2
 
 # LLM Provider API Keys
 OPENAI_API_KEY=sk-...
@@ -840,7 +840,7 @@ npm start
 
 Agent configuration is in `sekuire.yml`. Key settings:
 
-- **LLM**: Currently using gpt-4 (OpenAI)
+- **LLM**: Currently using gpt-5.2 (OpenAI)
 - **Compliance**: HIPAA framework enabled
 - **Tools**: calculator, web_search
 
@@ -2044,7 +2044,7 @@ server:
     origins: ["*"]
 
   auth:
-    type: "none"
+    type: "signed"
 "#,
         framework
     );
@@ -2119,7 +2119,11 @@ export class AgentService {
 /// Express HTTP server template
 pub const TS_HTTP_EXPRESS: &str = r#"import express from "express";
 import cors from "cors";
-import { SekuireServer, createSekuireExpressMiddleware } from "@sekuire/sdk";
+import {
+  SekuireServer,
+  createSekuireExpressMiddleware,
+  createSekuireExpressRequestAuthMiddleware,
+} from "@sekuire/sdk";
 import { AgentService } from "./agent";
 import fs from "fs/promises";
 import dotenv from "dotenv";
@@ -2138,10 +2142,16 @@ async function startServer() {
   // Load keys for Sekuire protocol
   const privateKey = (await fs.readFile(".sekuire/secret.key", "utf-8")).trim();
   const publicKey = (await fs.readFile(".sekuire/public.key", "utf-8")).trim();
+  const sekuireAgentId = process.env.SEKUIRE_AGENT_ID || agentService.getName();
+  const sekuireServer = new MyAgentServer(sekuireAgentId, {
+    privateKey,
+    publicKey,
+  });
 
   const app = express();
   app.use(cors());
   app.use(express.json());
+  app.use(createSekuireExpressRequestAuthMiddleware(sekuireServer));
 
   // Health endpoint
   app.get("/health", (req, res) => {
@@ -2186,11 +2196,6 @@ async function startServer() {
   });
 
   // Sekuire protocol endpoints (leverages SDK middleware)
-  // Note: Agent ID would typically come from sekuire.yml
-  const sekuireServer = new MyAgentServer("agent-id-placeholder", {
-    privateKey,
-    publicKey,
-  });
   app.use(createSekuireExpressMiddleware(sekuireServer));
 
   const port = process.env.PORT || 8000;
@@ -2219,7 +2224,11 @@ export default startServer;
 /// Fastify HTTP server template
 pub const TS_HTTP_FASTIFY: &str = r#"import Fastify from "fastify";
 import cors from "@fastify/cors";
-import { SekuireServer, createSekuireFastifyPlugin } from "@sekuire/sdk";
+import {
+  SekuireServer,
+  createSekuireFastifyPlugin,
+  createSekuireFastifyRequestAuthHook,
+} from "@sekuire/sdk";
 import { AgentService } from "./agent";
 import fs from "fs/promises";
 import dotenv from "dotenv";
@@ -2243,6 +2252,12 @@ async function startServer() {
   // Load keys for Sekuire protocol
   const privateKey = (await fs.readFile(".sekuire/secret.key", "utf-8")).trim();
   const publicKey = (await fs.readFile(".sekuire/public.key", "utf-8")).trim();
+  const sekuireAgentId = process.env.SEKUIRE_AGENT_ID || agentService.getName();
+  const sekuireServer = new MyAgentServer(sekuireAgentId, {
+    privateKey,
+    publicKey,
+  });
+  fastify.addHook("preHandler", createSekuireFastifyRequestAuthHook(sekuireServer));
 
   // Health endpoint
   fastify.get("/health", async (request, reply) => {
@@ -2291,10 +2306,6 @@ async function startServer() {
   });
 
   // Sekuire protocol endpoints (leverages SDK plugin)
-  const sekuireServer = new MyAgentServer("agent-id-placeholder", {
-    privateKey,
-    publicKey,
-  });
   await fastify.register(createSekuireFastifyPlugin(sekuireServer));
 
   const port = Number(process.env.PORT) || 8000;
@@ -2328,11 +2339,14 @@ export default startServer;
 pub const TS_HTTP_HONO: &str = r#"import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
+import { SekuireServer } from "@sekuire/sdk";
 import { AgentService } from "./agent";
 import fs from "fs/promises";
 import dotenv from "dotenv";
 
 dotenv.config();
+
+class MyAgentServer extends SekuireServer {}
 
 async function startServer() {
   const app = new Hono();
@@ -2346,6 +2360,19 @@ async function startServer() {
   // Load keys for Sekuire protocol
   const privateKey = (await fs.readFile(".sekuire/secret.key", "utf-8")).trim();
   const publicKey = (await fs.readFile(".sekuire/public.key", "utf-8")).trim();
+  const sekuireAgentId = process.env.SEKUIRE_AGENT_ID || agentService.getName();
+  const sekuireServer = new MyAgentServer(sekuireAgentId, { privateKey, publicKey });
+
+  async function verifySignedRequest(c: any, body: unknown, path: string) {
+    await sekuireServer.verifySignedRequest({
+      method: c.req.method,
+      path,
+      body,
+      sessionToken: c.req.header("x-sekuire-session"),
+      timestamp: c.req.header("x-sekuire-timestamp"),
+      signature: c.req.header("x-sekuire-signature"),
+    });
+  }
 
   // Health endpoint
   app.get("/health", (c) => {
@@ -2359,7 +2386,13 @@ async function startServer() {
   // Chat endpoint
   app.post("/chat", async (c) => {
     try {
-      const { message, context } = await c.req.json();
+      const payload = await c.req.json();
+      try {
+        await verifySignedRequest(c, payload, "/chat");
+      } catch (error) {
+        return c.json({ error: (error as Error).message }, 401);
+      }
+      const { message, context } = payload;
 
       if (!message) {
         return c.json({ error: "Message required" }, 400);
@@ -2377,6 +2410,11 @@ async function startServer() {
   app.post("/webhook", async (c) => {
     try {
       const payload = await c.req.json();
+      try {
+        await verifySignedRequest(c, payload, "/webhook");
+      } catch (error) {
+        return c.json({ error: (error as Error).message }, 401);
+      }
       const message = `Process webhook: ${JSON.stringify(payload)}`;
       const response = await agentService.chat(message, {
         source: "webhook",
@@ -2390,17 +2428,11 @@ async function startServer() {
     }
   });
 
-  // Sekuire protocol endpoints (manual implementation)
+  // Sekuire protocol endpoints
   app.post("/sekuire/hello", async (c) => {
     try {
       const { clientNonce } = await c.req.json();
-
-      // Basic handshake response (simplified)
-      return c.json({
-        agentId: "agent-id-placeholder",
-        publicKey: publicKey,
-        message: "Hello from Sekuire agent",
-      });
+      return c.json(await sekuireServer.handleHello({ clientNonce }));
     } catch (error) {
       return c.json({ error: "Handshake failed" }, 400);
     }
@@ -2408,8 +2440,14 @@ async function startServer() {
 
   app.post("/sekuire/auth", async (c) => {
     try {
-      // Basic auth response (simplified)
-      return c.json({ success: true });
+      const payload = await c.req.json();
+      const clientNonce = payload?.clientNonce || c.req.header("x-client-nonce");
+      if (!clientNonce) {
+        return c.json({ error: "Missing client nonce" }, 400);
+      }
+
+      const result = await sekuireServer.handleAuth(payload, clientNonce);
+      return c.json(result);
     } catch (error) {
       return c.json({ error: "Auth failed" }, 400);
     }
@@ -2505,11 +2543,14 @@ if (mode === "http") {
 
 /// TypeScript built-in HTTP server template
 pub const TS_HTTP_BUILTIN: &str = r#"import http from "http";
+import { SekuireServer } from "@sekuire/sdk";
 import { AgentService } from "./agent";
 import fs from "fs/promises";
 import dotenv from "dotenv";
 
 dotenv.config();
+
+class MyAgentServer extends SekuireServer {}
 
 async function startServer() {
   const agentService = new AgentService();
@@ -2518,12 +2559,32 @@ async function startServer() {
   // Load keys for Sekuire protocol
   const privateKey = (await fs.readFile(".sekuire/secret.key", "utf-8")).trim();
   const publicKey = (await fs.readFile(".sekuire/public.key", "utf-8")).trim();
+  const sekuireAgentId = process.env.SEKUIRE_AGENT_ID || agentService.getName();
+  const sekuireServer = new MyAgentServer(sekuireAgentId, { privateKey, publicKey });
+
+  async function verifySignedRequest(
+    req: http.IncomingMessage,
+    path: string,
+    parsedBody: unknown
+  ) {
+    await sekuireServer.verifySignedRequest({
+      method: req.method || "POST",
+      path,
+      body: parsedBody,
+      sessionToken: req.headers["x-sekuire-session"],
+      timestamp: req.headers["x-sekuire-timestamp"],
+      signature: req.headers["x-sekuire-signature"],
+    });
+  }
 
   const server = http.createServer(async (req, res) => {
     // CORS headers
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Content-Type, x-client-nonce, x-sekuire-session, x-sekuire-timestamp, x-sekuire-signature"
+    );
 
     if (req.method === "OPTIONS") {
       res.writeHead(200);
@@ -2563,6 +2624,14 @@ async function startServer() {
             return;
           }
 
+          try {
+            await verifySignedRequest(req, "/chat", parsedBody);
+          } catch (error) {
+            res.writeHead(401, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: (error as Error).message }));
+            return;
+          }
+
           const response = await agentService.chat(message, context);
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ response }));
@@ -2571,6 +2640,14 @@ async function startServer() {
 
         // Webhook endpoint
         if (req.method === "POST" && req.url === "/webhook") {
+          try {
+            await verifySignedRequest(req, "/webhook", parsedBody);
+          } catch (error) {
+            res.writeHead(401, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: (error as Error).message }));
+            return;
+          }
+
           const message = `Process webhook: ${JSON.stringify(parsedBody)}`;
           const response = await agentService.chat(message, {
             source: "webhook",
@@ -2584,21 +2661,27 @@ async function startServer() {
 
         // Sekuire protocol - hello endpoint
         if (req.method === "POST" && req.url === "/sekuire/hello") {
+          const result = await sekuireServer.handleHello(parsedBody);
           res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(
-            JSON.stringify({
-              agentId: "agent-id-placeholder",
-              publicKey: publicKey,
-              message: "Hello from Sekuire agent",
-            })
-          );
+          res.end(JSON.stringify(result));
           return;
         }
 
         // Sekuire protocol - auth endpoint
         if (req.method === "POST" && req.url === "/sekuire/auth") {
+          const rawClientNonce = parsedBody?.clientNonce || req.headers["x-client-nonce"];
+          const clientNonce = Array.isArray(rawClientNonce)
+            ? rawClientNonce[0]
+            : rawClientNonce;
+          if (!clientNonce) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Missing client nonce" }));
+            return;
+          }
+
+          const result = await sekuireServer.handleAuth(parsedBody, clientNonce);
           res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ success: true }));
+          res.end(JSON.stringify(result));
           return;
         }
 
@@ -4387,7 +4470,7 @@ pub fn get_github_workflow(agent_name: &str, language: &str) -> String {
         _ => {
             r#"      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
       - run: npm ci
       - run: npm run build
       - name: Build Docker image

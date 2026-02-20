@@ -88,7 +88,6 @@ impl SekuireClient {
         let resp = self.post(path, body).await?;
         self.check_plan_limit(resp).await
     }
-
 }
 
 #[allow(dead_code)]

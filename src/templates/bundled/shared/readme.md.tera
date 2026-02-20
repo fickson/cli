@@ -20,7 +20,7 @@ npm start
 
 Agent configuration is in `sekuire.yml`. Key settings:
 
-- **LLM**: Currently using gpt-4 (OpenAI)
+- **LLM**: Currently using {{ llm_model }} ({{ llm_provider_display }})
 - **Compliance**: HIPAA framework enabled
 - **Tools**: calculator, web_search
 

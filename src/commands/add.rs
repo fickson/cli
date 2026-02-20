@@ -14,6 +14,7 @@ pub async fn execute_memory() -> Result<(), CliError> {
     }
 
     let content = fs::read_to_string(config_path).await?;
+    let mut sqlite_filename: Option<String> = None;
 
     let memory_options = &[
         "In-Memory (ephemeral)",
@@ -44,6 +45,7 @@ pub async fn execute_memory() -> Result<(), CliError> {
                 .default("./agent_memory.db".into())
                 .interact_text()
                 .map_err(|e| CliError::Other(e.into()))?;
+            sqlite_filename = Some(filename.clone());
             (
                 "sqlite".to_string(),
                 format!("    config:\n      filename: \"{}\"", filename),
@@ -222,6 +224,32 @@ pub async fn execute_memory() -> Result<(), CliError> {
     };
 
     fs::write(config_path, updated_content).await?;
+
+    if let Some(filename) = sqlite_filename {
+        let configured_path = Path::new(&filename);
+        let sqlite_path = if configured_path.is_absolute() {
+            configured_path.to_path_buf()
+        } else {
+            config_path
+                .parent()
+                .unwrap_or(Path::new("."))
+                .join(configured_path)
+        };
+
+        if let Some(parent) = sqlite_path.parent() {
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent).await?;
+            }
+        }
+
+        fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(&sqlite_path)
+            .await?;
+
+        println!("   Created SQLite database file: {}", sqlite_path.display());
+    }
 
     println!("\nMemory backend configured successfully!");
     println!("   Type: {}", memory_type);

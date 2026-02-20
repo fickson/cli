@@ -255,9 +255,6 @@ mod tests {
             upgrade_url: "https://sekuire.ai/billing".into(),
             code: "FLEET_OPS_REQUIRES_UPGRADE".into(),
         };
-        assert_eq!(
-            err.to_string(),
-            "Your plan does not include fleet_ops."
-        );
+        assert_eq!(err.to_string(), "Your plan does not include fleet_ops.");
     }
 }
