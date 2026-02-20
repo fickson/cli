@@ -49,6 +49,46 @@ pub struct AuthConfig {
     pub workspace_id: Option<String>,       // NEW: Default workspace for install tokens
 }
 
+#[derive(serde::Deserialize)]
+struct MeWorkspace {
+    id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct MeResponse {
+    #[serde(default)]
+    workspaces: Vec<MeWorkspace>,
+}
+
+pub async fn fetch_default_workspace_id(
+    client: &reqwest::Client,
+    backend: &str,
+    api_key: &str,
+    device_fingerprint: &str,
+) -> Result<Option<String>> {
+    let url = format!("{}/api/v1/me", backend.trim_end_matches('/'));
+    let response = client
+        .get(&url)
+        .header("X-API-Key", api_key)
+        .header("X-Device-Fingerprint", device_fingerprint)
+        .send()
+        .await
+        .context("Failed to fetch current user context")?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        bail!("Failed to fetch workspace context ({}): {}", status, body);
+    }
+
+    let me: MeResponse = response
+        .json()
+        .await
+        .context("Failed to parse user context response")?;
+
+    Ok(me.workspaces.into_iter().next().map(|ws| ws.id))
+}
+
 pub async fn handle_status() -> Result<()> {
     println!("🔍 Authentication Status:");
 
@@ -320,13 +360,21 @@ pub async fn handle_login(web_url: &str, backend: &str) -> Result<()> {
                 fs::create_dir_all(&config_dir).await?;
             }
 
-            let existing_workspace_id = if config_dir.join("auth.json").exists() {
-                let content = fs::read_to_string(config_dir.join("auth.json")).await?;
-                serde_json::from_str::<AuthConfig>(&content)
-                    .ok()
-                    .and_then(|cfg| cfg.workspace_id)
-            } else {
-                None
+            let workspace_id = match ui::with_spinner_if(
+                ui::spinner_enabled(None),
+                "Syncing default workspace...",
+                async {
+                    fetch_default_workspace_id(&client, backend, &api_key, &device_fingerprint)
+                        .await
+                },
+            )
+            .await
+            {
+                Ok(workspace) => workspace,
+                Err(err) => {
+                    eprintln!("⚠️  Could not sync default workspace from server: {}", err);
+                    None
+                }
             };
 
             let auth_config = AuthConfig {
@@ -334,7 +382,7 @@ pub async fn handle_login(web_url: &str, backend: &str) -> Result<()> {
                 token: None,
                 device_fingerprint: Some(device_fingerprint.clone()),
                 org_id,
-                workspace_id: existing_workspace_id,
+                workspace_id,
             };
 
             fs::write(

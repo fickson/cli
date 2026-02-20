@@ -1,6 +1,6 @@
 use crate::config;
 use crate::error::CliError;
-use crate::services::auth::AuthConfig;
+use crate::services::auth::{fetch_default_workspace_id, AuthConfig};
 use crate::services::device::{get_device_fingerprint, get_device_name, get_device_os};
 use crate::ui;
 use dialoguer::{theme::ColorfulTheme, Input};
@@ -73,13 +73,18 @@ pub async fn execute(web_url: &str, backend: &str) -> Result<(), CliError> {
         tokio::fs::create_dir_all(&config_dir).await?;
     }
 
-    let existing_workspace_id = if config_dir.join(config::AUTH_CONFIG_FILE).exists() {
-        let content = tokio::fs::read_to_string(config_dir.join(config::AUTH_CONFIG_FILE)).await?;
-        serde_json::from_str::<AuthConfig>(&content)
-            .ok()
-            .and_then(|cfg| cfg.workspace_id)
-    } else {
-        None
+    let workspace_id = match ui::with_spinner_if(
+        ui::spinner_enabled(None),
+        "Syncing default workspace...",
+        async { fetch_default_workspace_id(&client, backend, &api_key, &device_fingerprint).await },
+    )
+    .await
+    {
+        Ok(workspace) => workspace,
+        Err(err) => {
+            eprintln!("Warning: Could not sync default workspace: {}", err);
+            None
+        }
     };
 
     let auth_config = AuthConfig {
@@ -87,7 +92,7 @@ pub async fn execute(web_url: &str, backend: &str) -> Result<(), CliError> {
         token: None,
         device_fingerprint: Some(device_fingerprint.clone()),
         org_id,
-        workspace_id: existing_workspace_id,
+        workspace_id,
     };
 
     tokio::fs::write(

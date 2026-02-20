@@ -100,9 +100,15 @@ pub async fn execute(
 
     println!("   Agent Command: {}", run_cmd);
 
-    let parts: Vec<&str> = run_cmd.split_whitespace().collect();
-    let mut child = tokio::process::Command::new(parts[0])
-        .args(&parts[1..])
+    let (program, args, env_overrides) = parse_run_command(&run_cmd)?;
+    let mut command = tokio::process::Command::new(program);
+    command.args(args);
+
+    for (key, value) in env_overrides {
+        command.env(key, value);
+    }
+
+    let mut child = command
         .env("SEKUIRE_WORKSPACE_ID", &workspace_id)
         .env("SEKUIRE_AUTH_TOKEN", &bootstrap.runtime_token)
         .env("SEKUIRE_RUNTIME_TOKEN", &bootstrap.runtime_token)
@@ -199,5 +205,119 @@ fn handle_pending_command(cmd: &str, _pid: u32) {
                 other
             );
         }
+    }
+}
+
+fn parse_run_command(
+    run_cmd: &str,
+) -> Result<(String, Vec<String>, Vec<(String, String)>), CliError> {
+    let parts = shell_words::split(run_cmd).map_err(|err| {
+        CliError::InvalidInput(format!(
+            "Could not parse --cmd. Check quoting and escaping: {}",
+            err
+        ))
+    })?;
+
+    if parts.is_empty() {
+        return Err(CliError::InvalidInput(
+            "Run command cannot be empty. Use --cmd '<command>'".into(),
+        ));
+    }
+
+    let mut env_overrides = Vec::new();
+    let mut command_index = 0usize;
+
+    while command_index < parts.len() {
+        if let Some((key, value)) = parse_env_assignment(&parts[command_index]) {
+            env_overrides.push((key.to_string(), value.to_string()));
+            command_index += 1;
+        } else {
+            break;
+        }
+    }
+
+    if command_index >= parts.len() {
+        return Err(CliError::InvalidInput(
+            "Run command must include an executable after env assignments".into(),
+        ));
+    }
+
+    let program = parts[command_index].clone();
+    let args = parts[command_index + 1..].to_vec();
+
+    Ok((program, args, env_overrides))
+}
+
+fn parse_env_assignment(token: &str) -> Option<(&str, &str)> {
+    let (key, value) = token.split_once('=')?;
+    if !is_valid_env_key(key) {
+        return None;
+    }
+    Some((key, value))
+}
+
+fn is_valid_env_key(key: &str) -> bool {
+    let mut chars = key.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+
+    if first != '_' && !first.is_ascii_alphabetic() {
+        return false;
+    }
+
+    chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_run_command;
+
+    #[test]
+    fn parses_simple_command() {
+        let (program, args, envs) = parse_run_command("npm start").expect("command should parse");
+        assert_eq!(program, "npm");
+        assert_eq!(args, vec!["start".to_string()]);
+        assert!(envs.is_empty());
+    }
+
+    #[test]
+    fn parses_command_with_env_prefix() {
+        let (program, args, envs) =
+            parse_run_command("PORT=8011 NODE_ENV=production node dist/index.js")
+                .expect("command should parse");
+        assert_eq!(program, "node");
+        assert_eq!(args, vec!["dist/index.js".to_string()]);
+        assert_eq!(
+            envs,
+            vec![
+                ("PORT".to_string(), "8011".to_string()),
+                ("NODE_ENV".to_string(), "production".to_string())
+            ]
+        );
+    }
+
+    #[test]
+    fn parses_quoted_arguments() {
+        let (program, args, envs) =
+            parse_run_command("node --title \"my agent\" app.js").expect("command should parse");
+        assert_eq!(program, "node");
+        assert_eq!(
+            args,
+            vec![
+                "--title".to_string(),
+                "my agent".to_string(),
+                "app.js".to_string()
+            ]
+        );
+        assert!(envs.is_empty());
+    }
+
+    #[test]
+    fn rejects_env_only_command() {
+        let err = parse_run_command("PORT=8011").expect_err("must fail without executable");
+        assert!(err
+            .to_string()
+            .contains("must include an executable after env assignments"));
     }
 }

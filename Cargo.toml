@@ -43,6 +43,7 @@ chrono = { version = "0.4", features = ["serde"] }
 indicatif = "0.17"
 urlencoding = "2.1"
 webbrowser = "0.8"
+shell-words = "1.1"
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.27", features = ["signal"] }

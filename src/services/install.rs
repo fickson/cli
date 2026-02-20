@@ -468,7 +468,8 @@ struct HelmServiceValues {
 pub struct BootstrapResponse {
     pub installation_id: String,
     pub runtime_token: String,
-    refresh_token: String,
+    #[serde(default)]
+    pub refresh_token: Option<String>,
     expires_at: String,
     heartbeat_interval: i64,
 }
