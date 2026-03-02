@@ -175,7 +175,7 @@ jobs:
         run: |
           git add Cargo.toml Cargo.lock
           git commit -m "chore: bump CLI version to ${{ steps.calculate_version.outputs.new_version }}"
-          git pull --rebase origin master
+          git pull --rebase origin main
           git push origin HEAD
 
       - name: Create and Push Tag
