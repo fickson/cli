@@ -1,28 +1,14 @@
 # Sekuire CLI Installation Guide
 
-## Quick Install
+## Quick Install (Recommended)
 
-### macOS (Apple Silicon)
 ```bash
-curl -LO https://github.com/YOUR_ORG/agent/releases/latest/download/sekuire-darwin-arm64.tar.gz
-tar -xzf sekuire-darwin-arm64.tar.gz
-sudo mv sekuire-darwin-arm64 /usr/local/bin/sekuire
-sekuire --version
+curl -fsSL https://install.sekuire.ai | sh
 ```
 
-### macOS (Intel)
-```bash
-curl -LO https://github.com/YOUR_ORG/agent/releases/latest/download/sekuire-darwin-amd64.tar.gz
-tar -xzf sekuire-darwin-amd64.tar.gz
-sudo mv sekuire-darwin-amd64 /usr/local/bin/sekuire
-sekuire --version
-```
+Verify installation:
 
-### Linux (x86_64)
 ```bash
-curl -LO https://github.com/YOUR_ORG/agent/releases/latest/download/sekuire-linux-amd64.tar.gz
-tar -xzf sekuire-linux-amd64.tar.gz
-sudo mv sekuire-linux-amd64 /usr/local/bin/sekuire
 sekuire --version
 ```
 
@@ -30,7 +16,20 @@ sekuire --version
 
 ## Installation Methods
 
-### 1. Pre-built Binaries (Recommended)
+### 1. Install Script (Recommended)
+
+```bash
+curl -fsSL https://install.sekuire.ai | sh
+```
+
+This installer:
+- Detects your platform and architecture
+- Downloads the latest Sekuire CLI binary
+- Verifies the download with SHA256 checksum
+- Installs to `~/.sekuire/bin/`
+- Adds to your PATH automatically
+
+### 2. Pre-built Binaries
 
 Download the latest release from [GitHub Releases](https://github.com/YOUR_ORG/agent/releases).
 
@@ -41,13 +40,6 @@ curl -LO https://github.com/YOUR_ORG/agent/releases/latest/download/sekuire-darw
 
 # Verify
 sha256sum -c sekuire-darwin-arm64.tar.gz.sha256
-```
-
-### 2. Homebrew (macOS - Coming Soon)
-
-```bash
-brew tap sekuire/tap
-brew install sekuire
 ```
 
 ### 3. Cargo (Build from Source)
@@ -128,11 +120,6 @@ sekuire keygen
 ### Pre-built Binaries
 Download and replace the binary with the new version.
 
-### Homebrew
-```bash
-brew upgrade sekuire
-```
-
 ### Cargo
 ```bash
 cargo install sekuire-agent-cli --force
@@ -152,34 +139,29 @@ sudo rm /usr/local/bin/sekuire
 rm -rf ~/.sekuire
 ```
 
-### Homebrew
-```bash
-brew uninstall sekuire
-```
-
 ---
 
 ## Troubleshooting
 
 ### "command not found: sekuire"
-Make sure `/usr/local/bin` is in your PATH:
+Make sure `~/.sekuire/bin` is in your PATH:
 ```bash
-echo $PATH | grep /usr/local/bin
+echo $PATH | grep "$HOME/.sekuire/bin"
 ```
 
 If not, add to your shell config:
 ```bash
 # For bash
-echo 'export PATH="/usr/local/bin:$PATH"' >> ~/.bashrc
+echo 'export PATH="$HOME/.sekuire/bin:$PATH"' >> ~/.bashrc
 
 # For zsh
-echo 'export PATH="/usr/local/bin:$PATH"' >> ~/.zshrc
+echo 'export PATH="$HOME/.sekuire/bin:$PATH"' >> ~/.zshrc
 ```
 
 ### Permission Denied
 On macOS Catalina+, you may need to allow the binary:
 ```bash
-xattr -d com.apple.quarantine /usr/local/bin/sekuire
+xattr -d com.apple.quarantine ~/.sekuire/bin/sekuire
 ```
 
 Or go to **System Preferences → Security & Privacy** and click "Allow Anyway".

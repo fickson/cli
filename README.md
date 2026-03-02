@@ -6,14 +6,8 @@ The command-line interface for the Sekuire Trust Protocol.
 
 ### Quick Install (Recommended)
 
-**macOS / Linux:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sekuire/install/main/install.sh | sh
-```
-
-**Windows (PowerShell):**
-```powershell
-irm https://raw.githubusercontent.com/sekuire/install/main/install.ps1 | iex
+curl -fsSL https://install.sekuire.ai | sh
 ```
 
 Verify installation:
