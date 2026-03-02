@@ -32,11 +32,11 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  RELEASE_REPO: sekuire/releases  # Public repository for releases
+  RELEASE_REPO: sekuire/releases
 
 permissions:
-  contents: write  # Allow pushing commits and tags
-  packages: write  # Allow package publishing
+  contents: write
+  packages: write
 
 jobs:
   prepare-release:
@@ -58,22 +58,20 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Calculate New Version
         id: calculate_version
         run: |
-          # Get current version from CLI package
-          CURRENT=$(grep '^version = ' packages/cli/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          CURRENT=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
           echo "Current version: $CURRENT"
 
-          # Remove pre-release suffix if present to get base version
           BASE_VERSION=$(echo "$CURRENT" | cut -d'-' -f1)
 
-          # Calculate new version based on bump type
           case "${{ github.event.inputs.version_bump }}" in
             patch)
-              # Split base version into parts (e.g., 0.1.1 -> 0, 1, 1)
               IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
-              # If current is beta, use same base, otherwise increment patch
               if [[ $CURRENT == *"-beta."* ]]; then
                 NEW_VERSION="$MAJOR.$MINOR.$PATCH"
               else
@@ -90,11 +88,9 @@ jobs:
               ;;
             beta)
               if [[ $CURRENT == *"-beta."* ]]; then
-                # Already a beta, increment beta number (0.1.1-beta.1 -> 0.1.1-beta.2)
                 BETA_NUM=$(echo $CURRENT | grep -oP 'beta\.\K\d+')
                 NEW_VERSION="$BASE_VERSION-beta.$((BETA_NUM + 1))"
               else
-                # Not a beta, bump patch and add -beta.1 (0.1.0 -> 0.1.1-beta.1)
                 IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
                 NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))-beta.1"
               fi
@@ -107,10 +103,17 @@ jobs:
       - name: Update CLI Version
         run: |
           NEW_VERSION="${{ steps.calculate_version.outputs.new_version }}"
-          # Update only the CLI Cargo.toml
-          sed -i.bak "s/^version = \".*\"/version = \"$NEW_VERSION\"/" packages/cli/Cargo.toml
-          rm packages/cli/Cargo.toml.bak
-          echo "Updated packages/cli/Cargo.toml to version $NEW_VERSION"
+          sed -i.bak "s/^version = \".*\"/version = \"$NEW_VERSION\"/" Cargo.toml
+          rm Cargo.toml.bak
+          echo "Updated Cargo.toml to version $NEW_VERSION"
+
+      - name: Update Cargo.lock
+        run: cargo generate-lockfile
+
+      - name: Build and Test
+        run: |
+          cargo build --release
+          cargo test
 
       - name: Generate Changelog
         id: generate_changelog
@@ -120,24 +123,16 @@ jobs:
             PREV_TAG=$(git rev-list --max-parents=0 HEAD)
           fi
 
-          # Generate changelog from commits
           CHANGELOG=$(git log $PREV_TAG..HEAD --pretty=format:"- %s" --no-merges | grep -E "^- (feat|fix|chore|docs|refactor|perf|test):" || echo "- Initial release")
 
-          # Format changelog
           echo "## What's Changed" > CHANGELOG_TEMP.md
           echo "" >> CHANGELOG_TEMP.md
-          echo "$CHANGELOG" | sed 's/^- feat:/### ✨ New Features\n-/g; s/^- fix:/### 🐛 Bug Fixes\n-/g; s/^- chore:/### 🔧 Chores\n-/g' >> CHANGELOG_TEMP.md
+          echo "$CHANGELOG" | sed 's/^- feat:/### New Features\n-/g; s/^- fix:/### Bug Fixes\n-/g; s/^- chore:/### Chores\n-/g' >> CHANGELOG_TEMP.md
 
           CHANGELOG_CONTENT=$(cat CHANGELOG_TEMP.md)
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           echo "$CHANGELOG_CONTENT" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Update Cargo.lock
-        run: |
-          # Update Cargo.lock without full dependency download
-          cargo generate-lockfile
-          git add Cargo.lock
 
       - name: Compute Build Matrix
         id: compute_matrix
@@ -181,7 +176,7 @@ jobs:
 
       - name: Commit Version Bump
         run: |
-          git add packages/cli/Cargo.toml Cargo.lock
+          git add Cargo.toml Cargo.lock
           git commit -m "chore: bump CLI version to ${{ steps.calculate_version.outputs.new_version }}"
           git pull --rebase origin master
           git push origin HEAD
@@ -215,12 +210,11 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ matrix.target }}-${{ hashFiles('packages/cli/Cargo.toml', 'packages/protocol/Cargo.toml', 'Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ matrix.target }}-${{ hashFiles('Cargo.toml', 'Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-${{ matrix.target }}-
 
       - name: Build Binary
-        working-directory: packages/cli
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Package Binary (Unix)
@@ -251,17 +245,33 @@ jobs:
             ${{ matrix.name }}.${{ matrix.archive }}
             ${{ matrix.name }}.${{ matrix.archive }}.sha256
 
-  create-release:
-    name: Create GitHub Release
+  publish-and-release:
+    name: Publish and Create GitHub Release
     needs: [prepare-release, build-and-upload]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: "v${{ needs.prepare-release.outputs.new_version }}"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+
+      - name: Load secrets from 1Password
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN_PRODUCTION }}
+          CRATES_TOKEN: op://Sekuire Production/Sekuire Release Tokens/CRATES_TOKEN
+
+      - name: Publish to crates.io
+        run: cargo publish --token "${{ env.CRATES_TOKEN }}"
 
       - name: Create Release in Public Repo
         uses: softprops/action-gh-release@v1
@@ -273,6 +283,11 @@ jobs:
             ${{ needs.prepare-release.outputs.changelog }}
 
             ## Quick Install
+
+            ### Cargo (crates.io)
+            ```bash
+            cargo install sekuire-agent-cli@${{ needs.prepare-release.outputs.new_version }}
+            ```
 
             ### macOS / Linux
             ```bash
@@ -317,7 +332,7 @@ jobs:
 
             ---
 
-            Full installation guide: https://github.com/sekuire/agent/blob/master/docs/getting-started/installation.md
+            Full installation guide: https://docs.sekuire.ai/getting-started/installation
           files: artifacts/**/*
           draft: false
           prerelease: ${{ contains(needs.prepare-release.outputs.new_version, 'beta') }}
