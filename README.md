@@ -15,48 +15,10 @@ Verify installation:
 sekuire --version
 ```
 
-### Cargo
+### Windows (PowerShell)
 
-```bash
-cargo install sekuire-agent-cli
-```
-
-### Manual Binary Installation
-
-Download the latest release from [GitHub Releases](https://github.com/sekuire/releases/releases/latest).
-
-**macOS (Apple Silicon):**
-```bash
-curl -LO https://github.com/sekuire/releases/releases/latest/download/sekuire-darwin-arm64.tar.gz
-tar -xzf sekuire-darwin-arm64.tar.gz
-sudo mv sekuire /usr/local/bin/sekuire
-```
-
-**macOS (Intel):**
-```bash
-curl -LO https://github.com/sekuire/releases/releases/latest/download/sekuire-darwin-amd64.tar.gz
-tar -xzf sekuire-darwin-amd64.tar.gz
-sudo mv sekuire /usr/local/bin/sekuire
-```
-
-**Linux (x86_64):**
-```bash
-curl -LO https://github.com/sekuire/releases/releases/latest/download/sekuire-linux-amd64.tar.gz
-tar -xzf sekuire-linux-amd64.tar.gz
-sudo mv sekuire /usr/local/bin/sekuire
-```
-
-**Windows (x86_64):**
 ```powershell
-Invoke-WebRequest -Uri https://github.com/sekuire/releases/releases/latest/download/sekuire-windows-x86_64.zip -OutFile sekuire.zip
-Expand-Archive sekuire.zip -DestinationPath .
-# Add sekuire.exe to your PATH
-```
-
-**Verify the download (recommended):**
-```bash
-curl -LO https://github.com/sekuire/releases/releases/latest/download/checksums.txt
-sha256sum -c checksums.txt --ignore-missing
+irm https://install.sekuire.ai/windows | iex
 ```
 
 ### Build from Source
@@ -64,11 +26,13 @@ sha256sum -c checksums.txt --ignore-missing
 Requires Rust 1.70+ and Cargo.
 
 ```bash
-git clone https://github.com/sekuire/sekuire.git
-cd sekuire/packages/cli
+git clone https://github.com/sekuire/cli.git
+cd cli
 cargo build --release
 sudo mv target/release/sekuire /usr/local/bin/
 ```
+
+For manual binary downloads, see [GitHub Releases](https://github.com/sekuire/releases/releases/latest).
 
 ## Usage
 
