@@ -39,8 +39,53 @@ permissions:
   packages: write
 
 jobs:
+  publish-protocol:
+    name: Publish sekuire-protocol to crates.io
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if sekuire-protocol is already published
+        id: check
+        run: |
+          if cargo search sekuire-protocol 2>/dev/null | grep -q '^sekuire-protocol '; then
+            echo "published=true" >> $GITHUB_OUTPUT
+            echo "sekuire-protocol is already on crates.io, skipping publish"
+          else
+            echo "published=false" >> $GITHUB_OUTPUT
+            echo "sekuire-protocol not found on crates.io, will publish"
+          fi
+
+      - name: Checkout platform repo
+        if: steps.check.outputs.published == 'false'
+        uses: actions/checkout@v4
+        with:
+          repository: sekuire/sekuire
+          ref: master
+          token: ${{ secrets.RELEASE_REPO_TOKEN }}
+
+      - name: Install Rust
+        if: steps.check.outputs.published == 'false'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Load secrets from 1Password
+        if: steps.check.outputs.published == 'false'
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN_PRODUCTION }}
+          CRATES_TOKEN: op://Sekuire Production/Sekuire Release Tokens/CRATES_TOKEN
+
+      - name: Publish sekuire-protocol
+        if: steps.check.outputs.published == 'false'
+        run: cargo publish -p sekuire-protocol --token "${{ env.CRATES_TOKEN }}"
+
+      - name: Wait for crates.io index propagation
+        if: steps.check.outputs.published == 'false'
+        run: sleep 30
+
   prepare-release:
     name: Prepare Release
+    needs: publish-protocol
     runs-on: ubuntu-latest
     outputs:
       new_version: ${{ steps.calculate_version.outputs.new_version }}
@@ -106,9 +151,6 @@ jobs:
           sed -i.bak "s/^version = \".*\"/version = \"$NEW_VERSION\"/" Cargo.toml
           rm Cargo.toml.bak
           echo "Updated Cargo.toml to version $NEW_VERSION"
-
-      - name: Update Cargo.lock
-        run: cargo generate-lockfile
 
       - name: Build and Test
         run: |
