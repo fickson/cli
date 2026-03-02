@@ -1794,7 +1794,7 @@ dependencies = [
 
 [[package]]
 name = "sekuire-agent-cli"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "anyhow",
  "base64",
@@ -1827,7 +1827,9 @@ dependencies = [
 
 [[package]]
 name = "sekuire-protocol"
-version = "0.1.0"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56912b0492aa98c73881c870ab8527fcef888fac73a70f05e3453c5d582d2de4"
 dependencies = [
  "schemars",
  "serde",
