@@ -254,11 +254,6 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Download Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
       - name: Load secrets from 1Password
         uses: 1password/load-secrets-action@v2
         with:
@@ -268,9 +263,14 @@ jobs:
           CRATES_TOKEN: op://Sekuire Production/Sekuire Release Tokens/CRATES_TOKEN
 
       - name: Publish to crates.io
-        run: cargo publish --allow-dirty
+        run: cargo publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ env.CRATES_TOKEN }}
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
 
       - name: Create Release in Public Repo
         uses: softprops/action-gh-release@v1
