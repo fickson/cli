@@ -1,0 +1,88 @@
+name: Release CLI
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump type
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+jobs:
+  publish-cli:
+    name: Publish sekuire-agent-cli to crates.io
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Load secrets from 1Password
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN_PRODUCTION }}
+          CRATES_TOKEN: op://Sekuire Production/Sekuire Release Tokens/CRATES_TOKEN
+
+      - name: Install cargo-edit
+        run: cargo install cargo-edit --locked
+
+      - name: Bump Version
+        run: |
+          cargo set-version --bump ${{ github.event.inputs.bump }}
+          NEW_VERSION=$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version')
+          echo "CLI_VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
+
+      - name: Build and Test
+        run: |
+          cargo build --release
+          cargo test
+
+      - name: Commit Version Changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Cargo.toml Cargo.lock
+          git commit -m "chore(release): sekuire-agent-cli v${{ env.CLI_VERSION }}"
+          git pull --rebase origin "${{ github.ref_name }}"
+          git push origin HEAD
+
+      - name: Create Git Tag
+        run: |
+          git tag -a "cli-v${{ env.CLI_VERSION }}" -m "sekuire-agent-cli v${{ env.CLI_VERSION }}"
+          git push origin "cli-v${{ env.CLI_VERSION }}"
+
+      - name: Publish to crates.io
+        run: cargo publish --token "${{ env.CRATES_TOKEN }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "cli-v${{ env.CLI_VERSION }}"
+          name: "Sekuire CLI v${{ env.CLI_VERSION }}"
+          body: |
+            ## Sekuire CLI Release
+
+            ### Installation
+
+            ```bash
+            cargo install sekuire-agent-cli@${{ env.CLI_VERSION }}
+            ```
+
+            ### Usage
+
+            ```bash
+            sekuire --help
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
