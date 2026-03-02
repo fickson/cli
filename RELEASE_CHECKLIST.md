@@ -56,7 +56,7 @@ Use this checklist when preparing a new CLI release.
 
 ### 2. Version Bump
 - [ ] Update version in `packages/cli/Cargo.toml`
-- [ ] Update version in `Cargo.lock`: `cargo update -p sekuire-agent-cli`
+- [ ] Update version in `Cargo.lock`: `cargo update -p sekuire-cli`
 - [ ] Commit version bump:
   ```bash
   git add packages/cli/Cargo.toml Cargo.lock
@@ -124,7 +124,7 @@ Use this checklist when preparing a new CLI release.
   cd packages/cli
   cargo publish --token $CARGO_REGISTRY_TOKEN
   ```
-- [ ] Verify package appears on [crates.io/crates/sekuire-agent-cli](https://crates.io/crates/sekuire-agent-cli)
+- [ ] Verify package appears on [crates.io/crates/sekuire-cli](https://crates.io/crates/sekuire-cli)
 
 ### Homebrew Tap (If applicable)
 - [ ] Update Homebrew formula in `homebrew-tap` repo

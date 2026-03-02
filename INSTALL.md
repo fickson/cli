@@ -47,7 +47,7 @@ sha256sum -c sekuire-darwin-arm64.tar.gz.sha256
 If you have Rust installed:
 
 ```bash
-cargo install sekuire-agent-cli
+cargo install sekuire-cli
 ```
 
 ### 4. From Source (Developers)
@@ -122,7 +122,7 @@ Download and replace the binary with the new version.
 
 ### Cargo
 ```bash
-cargo install sekuire-agent-cli --force
+cargo install sekuire-cli --force
 ```
 
 ---

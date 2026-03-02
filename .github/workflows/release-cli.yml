@@ -285,7 +285,7 @@ jobs:
 
             ### Cargo (crates.io)
             ```bash
-            cargo install sekuire-agent-cli@${{ needs.prepare-release.outputs.new_version }}
+            cargo install sekuire-cli@${{ needs.prepare-release.outputs.new_version }}
             ```
 
             ### macOS / Linux
