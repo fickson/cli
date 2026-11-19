@@ -1042,7 +1042,7 @@ export const searchTool = tool({
   }),
   execute: async ({ query }) => {
     // Mock implementation for demo
-    return `[Mock Search Results] found for: "${query}"\n1. Sekuire Documentation - https://docs.sekuire.ai\n2. Sekuire GitHub - https://github.com/sekuire/sekuire`;
+    return `[Mock Search Results] found for: "${query}"\n1. Sekuire Documentation - https://docs.sekuire.ai\n2. Sekuire GitHub - https://github.com/fickson/platform`;
   },
 });
 
