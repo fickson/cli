@@ -26,13 +26,13 @@ irm https://install.sekuire.ai/windows | iex
 Requires Rust 1.70+ and Cargo.
 
 ```bash
-git clone https://github.com/sekuire/cli.git
+git clone https://github.com/fickson/cli.git
 cd cli
 cargo build --release
 sudo mv target/release/sekuire /usr/local/bin/
 ```
 
-For manual binary downloads, see [GitHub Releases](https://github.com/sekuire/releases/releases/latest).
+For manual binary downloads, see [GitHub Releases](https://github.com/fickson/releases/releases/latest).
 
 ## Usage
 

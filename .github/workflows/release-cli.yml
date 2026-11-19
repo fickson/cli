@@ -32,7 +32,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  RELEASE_REPO: sekuire/releases
+  RELEASE_REPO: fickson/releases
 
 permissions:
   contents: write
@@ -341,7 +341,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.RELEASE_REPO_TOKEN }}
         run: |
-          gh api repos/sekuire/install/dispatches \
+          gh api repos/fickson/install/dispatches \
             --method POST \
             -f event_type=cli-release \
             -f "client_payload[version]=${{ needs.prepare-release.outputs.new_version }}"
